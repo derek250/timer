@@ -492,19 +492,53 @@
             return `${isNegative ? '-' : ''}${m}:${s}`;
         }
 
+        let bellPlayer = null;
+        let audioInitialized = false;
+
+        function initAudio() {
+            if (audioInitialized) return;
+            
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+
+            // 初始化 Tone.Player 並加載 GitHub 上的專屬鈴聲音檔
+            bellPlayer = new Tone.Player({
+                url: "https://raw.githubusercontent.com/derek250/timer/main/YTD.mp3", 
+                autostart: false,
+                onload: () => {
+                    console.log("Audio file loaded successfully.");
+                    audioInitialized = true;
+                },
+                onerror: (e) => {
+                    console.error("Error loading audio file:", e);
+                }
+            }).toDestination();
+            
+            // 稍微調高音量
+            bellPlayer.volume.value = 5; 
+        }
+
+        // 綁定全局點擊事件，確保在手機上第一次觸控就能解鎖音訊權限
+        document.addEventListener('click', function() {
+            if (Tone.context.state !== 'running') Tone.start();
+            initAudio();
+        }, { once: true });
+
         function playBeep(times) {
             try {
-                if (Tone.context.state !== 'running') Tone.start();
-                // 使用 PolySynth 讓多次打擊的尾音可以自然疊加，模擬真實實體桌鐘
-                const synth = new Tone.PolySynth(Tone.Synth, {
-                    oscillator: { type: "sine" }, // 使用純淨的正弦波模擬清脆金屬聲
-                    envelope: { attack: 0.005, decay: 2.5, sustain: 0, release: 1 } // 極快敲擊，長尾音延續
-                }).toDestination();
+                if (!audioInitialized) {
+                    initAudio();
+                    // 如果還沒載入完，先不要播放避免錯誤
+                    return;
+                }
                 
+                if (Tone.context.state !== 'running') Tone.start();
+
                 const now = Tone.now();
                 for (let i = 0; i < times; i++) {
-                    // 使用 G6 高音（約1568Hz），非常接近真實的計時清脆按鈴
-                    synth.triggerAttackRelease("G6", "16n", now + (i * 0.4));
+                    // 根據載入的音檔長度調整間隔，目前設定為 0.6 秒
+                    bellPlayer.start(now + (i * 0.6));
                 }
             } catch (e) {
                 console.error("Audio playback failed:", e);
